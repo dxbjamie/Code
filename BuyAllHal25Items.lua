@@ -1,7 +1,7 @@
 --Buy Hal 2025 Items
 repeat wait(0.01) until game.Players.LocalPlayer ~= nil
 if not game.Loaded then  game.Loaded:Wait() end --wait for game to fully load
---wait(180)
+wait(180)
 ---loadstring(game:HttpGet("https://pastebin.com/raw/Cn25rnPi"))()
 --loadstring(game:HttpGet"https://drive.google.com/uc?id=1cOwY1kpj1E819fID-FTpyMBCuRsURNZj"))()
 --https://drive.google.com/uc?id=1cOwY1kpj1E819fID-FTpyMBCuRsURNZj
@@ -83,6 +83,7 @@ wait(1)
 game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("pets", "halloween_2025_slimingo",{})
 wait(1)
 game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("gifts", "halloween_2025_sticker_pack",{})
+
 
 
 
