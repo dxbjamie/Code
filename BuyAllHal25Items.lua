@@ -62,6 +62,14 @@ end
 warn("Loaded")
 
 wait(10)
+game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("pets", "halloween_2025_slimingo",{})
+wait(1)
+game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("pets", "halloween_2025_ghostly_cat",{})
+wait(1)
+game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("pets", "halloween_2025_dj_snooze",{})
+wait(1)
+game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("pets", "halloween_2025_slimingo",{})
+wait(1)
 game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("pets", "halloween_2025_ghostly_cat",{})
 wait(1)
 game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("pets", "halloween_2025_dj_snooze",{})
@@ -79,10 +87,9 @@ wait(1)
 game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("transport", "halloween_2025_lava_dragon_bike",{})
 wait(1)
 game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("strollers", "halloween_2025_scarebear_stroller",{})
-wait(1)
-game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("pets", "halloween_2025_slimingo",{})
-wait(1)
-game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("gifts", "halloween_2025_sticker_pack",{})
+--wait(1)
+--game:GetService("ReplicatedStorage").API["ShopAPI/BuyItem"]:InvokeServer("gifts", "halloween_2025_sticker_pack",{})
+
 
 
 
