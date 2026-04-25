@@ -1,9 +1,10 @@
-local USER_KEY = "RH-P4UVG-O2C5Q-67KCY" 
+local USER_KEY = "RH-P4UVG-O2C5Q-67KCY" -- Sold
+
 repeat task.wait() until game:GetService("Players").LocalPlayer
 repeat task.wait() until game:IsLoaded()
 
 -- CONFIG
-local API_URL = "https://rh-script-loader.dxbjamie.workers.dev"
+local API_URL = "https://rh-script-loader.dxbjamie.workers.dev/"  -- trailing slash matters for some HTTP stacks
 local DEBUG = true  -- Set false in production to hide diagnostic output
 
 local SCRIPTS_TO_LOAD = {
@@ -47,6 +48,19 @@ local function getHWID()
 end
 
 local HWID = getHWID()
+
+-- ─── URL building with proper encoding ──────────────────────────────────────
+-- Roblox/Delta/many mobile executors reject malformed URLs with "InvalidUrl"
+-- before sending. Always URL-encode parameter values.
+local function buildUrl(params)
+    local parts = {}
+    for k, v in pairs(params) do
+        table.insert(parts,
+            HttpService:UrlEncode(tostring(k)) .. "=" ..
+            HttpService:UrlEncode(tostring(v)))
+    end
+    return API_URL .. "?" .. table.concat(parts, "&")
+end
 
 -- ─── HTTP layer with multi-executor fallback ────────────────────────────────
 -- Returns: { Success = bool, StatusCode = num, Body = string } OR nil + error
@@ -124,7 +138,15 @@ end
 
 -- ─── API calls ──────────────────────────────────────────────────────────────
 local function checkKeyStatus()
-    local url = API_URL .. "?key=" .. USER_KEY .. "&hwid=" .. HWID .. "&check=true"
+    local url = buildUrl({
+        key = USER_KEY,
+        hwid = HWID,
+        check = "true"
+    })
+
+    if DEBUG then
+        warn("[LOADER:DEBUG] URL: " .. url)
+    end
 
     local resp, err = httpGet(url)
     if not resp then
@@ -155,7 +177,11 @@ local function checkKeyStatus()
 end
 
 local function loadScript(fileName)
-    local url = API_URL .. "?key=" .. USER_KEY .. "&hwid=" .. HWID .. "&file=" .. fileName
+    local url = buildUrl({
+        key = USER_KEY,
+        hwid = HWID,
+        file = fileName
+    })
 
     local resp, err = httpGet(url)
     if not resp then
