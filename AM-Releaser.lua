@@ -1,4 +1,4 @@
-local USER_KEY = "RH-P4UVG-O2C5Q-67KCY" 
+local USER_KEY = "RH-P4UVG-O2C5Q-67KCY" -- Sold
 
 repeat task.wait() until game:GetService("Players").LocalPlayer
 repeat task.wait() until game:IsLoaded()
@@ -49,15 +49,23 @@ end
 
 local HWID = getHWID()
 
--- ─── URL building with proper encoding ──────────────────────────────────────
--- Roblox/Delta/many mobile executors reject malformed URLs with "InvalidUrl"
--- before sending. Always URL-encode parameter values.
+-- ─── URL building with safe encoding ───────────────────────────────────────
+-- Roblox's HttpService:UrlEncode is overzealous — it encodes "-" and other
+-- safe characters, which can break server-side string matching.
+-- We only encode characters that genuinely need encoding.
+local function safeEncode(s)
+    s = tostring(s)
+    -- Encode anything that isn't alphanumeric, dash, underscore, dot, or tilde
+    -- (these are RFC 3986 "unreserved" characters and never need encoding)
+    return (s:gsub("[^%w%-_%.~]", function(c)
+        return string.format("%%%02X", string.byte(c))
+    end))
+end
+
 local function buildUrl(params)
     local parts = {}
     for k, v in pairs(params) do
-        table.insert(parts,
-            HttpService:UrlEncode(tostring(k)) .. "=" ..
-            HttpService:UrlEncode(tostring(v)))
+        table.insert(parts, safeEncode(k) .. "=" .. safeEncode(v))
     end
     return API_URL .. "?" .. table.concat(parts, "&")
 end
