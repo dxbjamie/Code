@@ -1,4 +1,4 @@
-local USER_KEY = "RH-P4UVG-O2C5Q-67KCY" -- Sold
+local USER_KEY = "RH-P4UVG-O2C5Q-67KCY" 
 
 repeat task.wait() until game:GetService("Players").LocalPlayer
 repeat task.wait() until game:IsLoaded()
