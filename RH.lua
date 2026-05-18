@@ -14,7 +14,7 @@ return function(USER_KEY)
     local DEBUG = true
  
     local SCRIPTS_TO_LOAD = {
-        "RH-Allin1-Solver-Android.lua",
+        "RHAllin1-Frm-Solver.lua",
         "RHFPSCap.lua",
         "RHGui.lua",
     }
