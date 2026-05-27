@@ -423,9 +423,20 @@ Nexus.Connected:Connect(function()
     Nexus:SetAutoRelaunch(true)
 end)
 
--- Watch for the Roblox captcha overlay ("Start Puzzle" button in CoreGui).
+-- Watch for Roblox captcha overlays. Scans CoreGui and PlayerGui every 5 seconds.
+-- Detects multiple variants:
+--   "Start Puzzle"          — FunCaptcha arrow/image challenge
+--   "Verification"          — newer bot-verification overlay
+--   "Verifying you're not a bot" — accompanying label for the above
 -- Sends CaptchaDetected to C# so Account Control can shut down and relaunch
 -- this account if "Auto Close on Captcha" is enabled in its settings.
+local function isCaptchaText(text)
+    return text == 'Start Puzzle'
+        or text == 'Verification'
+        or text:find("Verifying you") ~= nil
+        or text:find("not a bot") ~= nil
+end
+
 task.spawn(function()
     repeat task.wait() until Nexus.IsConnected
 
@@ -433,9 +444,16 @@ task.spawn(function()
         if not Nexus.IsConnected then continue end
 
         local ok, found = pcall(function()
-            for _, v in ipairs(game:GetService('CoreGui'):GetDescendants()) do
-                if v:IsA('TextButton') and v.Text == 'Start Puzzle' then
-                    return true
+            -- Check both CoreGui (system overlays) and PlayerGui (game-placed UIs).
+            local roots = { game:GetService('CoreGui') }
+            local ok2, pg = pcall(function() return LocalPlayer:WaitForChild('PlayerGui', 0) end)
+            if ok2 and pg then table.insert(roots, pg) end
+
+            for _, root in ipairs(roots) do
+                for _, v in ipairs(root:GetDescendants()) do
+                    if (v:IsA('TextButton') or v:IsA('TextLabel')) and isCaptchaText(v.Text) then
+                        return true
+                    end
                 end
             end
             return false
