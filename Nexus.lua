@@ -426,15 +426,27 @@ end)
 -- Watch for Roblox captcha overlays. Scans CoreGui and PlayerGui every 5 seconds.
 -- Detects multiple variants:
 --   "Start Puzzle"          — FunCaptcha arrow/image challenge
---   "Verification"          — newer bot-verification overlay
+--   "Verification"          — older bot-verification overlay
 --   "Verifying you're not a bot" — accompanying label for the above
+--   "Security" + "Verify"/"Verifying" — Roblox's newer in-experience security overlay
 -- Sends CaptchaDetected to C# so Account Control can shut down and relaunch
 -- this account if "Auto Close on Captcha" is enabled in its settings.
+-- Specific, unambiguous captcha strings — safe to match in any GUI (CoreGui or PlayerGui).
 local function isCaptchaText(text)
     return text == 'Start Puzzle'
         or text == 'Verification'
         or text:find("Verifying you") ~= nil
         or text:find("not a bot") ~= nil
+end
+
+-- Roblox's newer "Security / Verify" overlay uses short, generic button text ('Verify',
+-- 'Verifying') under a 'Security' header. These short words can also appear in game-placed UI,
+-- so only treat them as a captcha when found in CoreGui — where Roblox renders its own security
+-- overlays — never in PlayerGui. This avoids false kills from a game's own "Verify" button.
+local function isSecurityOverlayText(text)
+    return text == 'Verify'
+        or text == 'Verifying'
+        or text == 'Security'
 end
 
 task.spawn(function()
@@ -445,14 +457,20 @@ task.spawn(function()
 
         local ok, found = pcall(function()
             -- Check both CoreGui (system overlays) and PlayerGui (game-placed UIs).
-            local roots = { game:GetService('CoreGui') }
+            local coreGui = game:GetService('CoreGui')
+            local roots = { coreGui }
             local ok2, pg = pcall(function() return LocalPlayer:WaitForChild('PlayerGui', 0) end)
             if ok2 and pg then table.insert(roots, pg) end
 
             for _, root in ipairs(roots) do
+                local isCoreGui = (root == coreGui)
                 for _, v in ipairs(root:GetDescendants()) do
-                    if (v:IsA('TextButton') or v:IsA('TextLabel')) and isCaptchaText(v.Text) then
-                        return true
+                    if v:IsA('TextButton') or v:IsA('TextLabel') then
+                        -- Specific strings match in any GUI; the generic "Security/Verify" overlay
+                        -- terms only count in CoreGui to avoid false positives from game UI.
+                        if isCaptchaText(v.Text) or (isCoreGui and isSecurityOverlayText(v.Text)) then
+                            return true
+                        end
                     end
                 end
             end
