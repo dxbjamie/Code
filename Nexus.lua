@@ -423,30 +423,46 @@ Nexus.Connected:Connect(function()
     Nexus:SetAutoRelaunch(true)
 end)
 
--- Watch for Roblox captcha overlays. Scans CoreGui and PlayerGui every 5 seconds.
--- Detects multiple variants:
---   "Start Puzzle"          — FunCaptcha arrow/image challenge
---   "Verification"          — older bot-verification overlay
---   "Verifying you're not a bot" — accompanying label for the above
---   "Security" + "Verify"/"Verifying" — Roblox's newer in-experience security overlay
--- Sends CaptchaDetected to C# so Account Control can shut down and relaunch
--- this account if "Auto Close on Captcha" is enabled in its settings.
--- Specific, unambiguous captcha strings — safe to match in any GUI (CoreGui or PlayerGui).
-local function isCaptchaText(text)
-    return text == 'Start Puzzle'
-        or text == 'Verification'
-        or text:find("Verifying you") ~= nil
-        or text:find("not a bot") ~= nil
+-- Watch for Roblox captcha / "are you human" overlays. Scans CoreGui and PlayerGui every 5s.
+-- STRUCTURAL detection rather than exact-string, so Roblox changing the overlay wording (as it
+-- did: "Start Puzzle" → "Security / Verify") no longer breaks detection:
+--   * CoreGui (Roblox's own overlay layer): match a broad, case-insensitive keyword set against
+--     the .Name of every descendant (catches the Captcha/FunCaptcha/Arkose CONTAINER even before
+--     any text renders) and against the .Text of every text object.
+--   * PlayerGui (game-placed UI): only the few highly-specific legacy strings, so a game's own
+--     "Verify"/"Security" button can't cause a false kill.
+-- On detection, CaptchaDetected is sent so Account Control can kill+relaunch (if "Auto Close on
+-- Captcha" is enabled) and the pre-launch solver clears it on the way back in.
+
+-- Instance NAME markers — very specific to the captcha system; these strings do not appear in
+-- normal Roblox system-UI element names, so matching them on .Name anywhere in CoreGui is safe.
+local CaptchaNamePatterns = { 'captcha', 'funcaptcha', 'arkose' }
+
+-- Visible TEXT markers — broad and case-insensitive; matched only against .Text in CoreGui.
+local CaptchaTextPatterns = {
+    'start puzzle', 'verifying you', "you're not a robot", 'not a bot', 'not a robot',
+    'are you human', 'human verification', 'press and hold',
+    'verification', 'verifying', 'verify', 'security', 'captcha', 'challenge',
+}
+
+-- True if any pattern is a substring of s (case-insensitive). 4th arg to string.find = plain
+-- (non-pattern) search, so characters like '(' in a pattern are treated literally.
+local function containsAny(s, patterns)
+    if type(s) ~= 'string' or s == '' then return false end
+    s = string.lower(s)
+    for _, p in ipairs(patterns) do
+        if string.find(s, p, 1, true) then return true end
+    end
+    return false
 end
 
--- Roblox's newer "Security / Verify" overlay uses short, generic button text ('Verify',
--- 'Verifying') under a 'Security' header. These short words can also appear in game-placed UI,
--- so only treat them as a captcha when found in CoreGui — where Roblox renders its own security
--- overlays — never in PlayerGui. This avoids false kills from a game's own "Verify" button.
-local function isSecurityOverlayText(text)
-    return text == 'Verify'
-        or text == 'Verifying'
-        or text == 'Security'
+-- Highly-specific legacy strings — safe to match even in game-placed PlayerGui.
+local function isSpecificCaptchaText(text)
+    if type(text) ~= 'string' then return false end
+    return text == 'Start Puzzle'
+        or text == 'Verification'
+        or text:find('Verifying you') ~= nil
+        or text:find('not a bot') ~= nil
 end
 
 task.spawn(function()
@@ -456,24 +472,27 @@ task.spawn(function()
         if not Nexus.IsConnected then continue end
 
         local ok, found = pcall(function()
-            -- Check both CoreGui (system overlays) and PlayerGui (game-placed UIs).
             local coreGui = game:GetService('CoreGui')
-            local roots = { coreGui }
-            local ok2, pg = pcall(function() return LocalPlayer:WaitForChild('PlayerGui', 0) end)
-            if ok2 and pg then table.insert(roots, pg) end
 
-            for _, root in ipairs(roots) do
-                local isCoreGui = (root == coreGui)
-                for _, v in ipairs(root:GetDescendants()) do
-                    if v:IsA('TextButton') or v:IsA('TextLabel') then
-                        -- Specific strings match in any GUI; the generic "Security/Verify" overlay
-                        -- terms only count in CoreGui to avoid false positives from game UI.
-                        if isCaptchaText(v.Text) or (isCoreGui and isSecurityOverlayText(v.Text)) then
-                            return true
-                        end
+            -- CoreGui: structural (Name) + broad (Text) match on every descendant.
+            for _, v in ipairs(coreGui:GetDescendants()) do
+                if containsAny(v.Name, CaptchaNamePatterns) then return true end
+                if (v:IsA('TextLabel') or v:IsA('TextButton') or v:IsA('TextBox'))
+                    and containsAny(v.Text, CaptchaTextPatterns) then
+                    return true
+                end
+            end
+
+            -- PlayerGui: specific legacy strings only (avoid false kills from game UI).
+            local okPg, pg = pcall(function() return LocalPlayer:WaitForChild('PlayerGui', 0) end)
+            if okPg and pg then
+                for _, v in ipairs(pg:GetDescendants()) do
+                    if (v:IsA('TextButton') or v:IsA('TextLabel')) and isSpecificCaptchaText(v.Text) then
+                        return true
                     end
                 end
             end
+
             return false
         end)
 
