@@ -456,17 +456,6 @@ local function containsAny(s, patterns)
     return false
 end
 
--- The GAME's own card-captcha lives in PlayerGui as an instance named "CardCaptchaGame" and is
--- handled by a dedicated in-game solver. While it is on screen we must NOT treat it as a Roblox
--- captcha and must NOT close the instance — otherwise the solver never gets a chance to run.
-local function gameCaptchaPresent()
-    local okPg, pg = pcall(function() return LocalPlayer:FindFirstChild('PlayerGui') end)
-    if okPg and pg then
-        return pg:FindFirstChild('CardCaptchaGame') ~= nil
-    end
-    return false
-end
-
 -- Highly-specific legacy strings — safe to match even in game-placed PlayerGui.
 local function isSpecificCaptchaText(text)
     if type(text) ~= 'string' then return false end
@@ -482,13 +471,12 @@ task.spawn(function()
     while task.wait(5) do
         if not Nexus.IsConnected then continue end
 
-        -- Skip the whole scan while the game's own card-captcha is up — the in-game solver owns it.
-        if gameCaptchaPresent() then continue end
-
         local ok, found = pcall(function()
             local coreGui = game:GetService('CoreGui')
 
-            -- CoreGui: structural (Name) + broad (Text) match on every descendant.
+            -- CoreGui: structural (Name) + broad (Text) match on every descendant. This is where the
+            -- real Roblox/Arkose captcha lives, so it is ALWAYS scanned — never suppressed by the
+            -- game's own card-captcha. (The game card-captcha is in PlayerGui, excluded below.)
             for _, v in ipairs(coreGui:GetDescendants()) do
                 if containsAny(v.Name, CaptchaNamePatterns) then return true end
                 if (v:IsA('TextLabel') or v:IsA('TextButton') or v:IsA('TextBox'))
@@ -497,11 +485,19 @@ task.spawn(function()
                 end
             end
 
-            -- PlayerGui: specific legacy strings only (avoid false kills from game UI).
+            -- PlayerGui: specific legacy strings only (avoid false kills from game UI). The game's
+            -- own card-captcha ("CardCaptchaGame") is handled by a dedicated in-game solver, so its
+            -- subtree is skipped here — otherwise its "Verification" text would cause a false kill.
+            -- Excluding only that subtree (rather than skipping the whole scan) keeps Roblox-captcha
+            -- detection alive even when CardCaptchaGame is permanently loaded in PlayerGui.
             local okPg, pg = pcall(function() return LocalPlayer:WaitForChild('PlayerGui', 0) end)
             if okPg and pg then
+                local cardCaptcha = pg:FindFirstChild('CardCaptchaGame')
                 for _, v in ipairs(pg:GetDescendants()) do
-                    if (v:IsA('TextButton') or v:IsA('TextLabel')) and isSpecificCaptchaText(v.Text) then
+                    local inGameCaptcha = cardCaptcha and (v == cardCaptcha or v:IsDescendantOf(cardCaptcha))
+                    if not inGameCaptcha
+                        and (v:IsA('TextButton') or v:IsA('TextLabel'))
+                        and isSpecificCaptchaText(v.Text) then
                         return true
                     end
                 end
